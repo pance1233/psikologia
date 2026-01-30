@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OBSERVATION PROTOCOL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+  --bg: #010103;
+  --fg: #ececf4;
+  --accent: #8a8aff;
+  --dx: 0px;
+  --dy: 0px;
+  --blur: 0px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Grain + scanlines */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+body::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.04),
+    rgba(255,255,255,0.04) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  opacity: 0.35;
+}
+
+body::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* Screen */
+#screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  transform: translate(var(--dx), var(--dy));
+  filter: blur(var(--blur));
+  transition: transform 10s ease, opacity 1.6s ease, filter 6s ease;
+}
+
+.panel {
+  max-width: 760px;
+}
+
+/* Text */
+h1 {
+  font-size: clamp(1.9rem, 5vw, 3.8rem);
+  letter-spacing: 0.3em;
+  font-weight: 700;
+  transition: letter-spacing 6s ease;
+}
+
+p {
+  font-size: 0.9rem;
+  letter-spacing: 0.18em;
+  opacity: 0.7;
+  line-height: 1.9;
+}
+
+/* Progress */
+#progress {
+  margin-top: 32px;
+  height: 4px;
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+}
+
+#bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 5s ease;
+}
+
+/* Buttons */
+button {
+  margin-top: 24px;
+  padding: 14px;
+  width: 100%;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid rgba(255,255,255,0.18);
+  cursor: pointer;
+  letter-spacing: 0.28em;
+  transition:
+    background 0.6s ease,
+    transform 1.2s ease,
+    opacity 0.6s ease;
+}
+
+button:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.choice { margin-top: 18px; }
+
+/* Aura */
+#aura {
+  position: fixed;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(138,138,255,0.18), transparent 60%);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  transition: transform 0.4s ease;
+}
+
+/* Whisper */
+.whisper {
+  position: fixed;
+  font-size: 0.6rem;
+  letter-spacing: 0.45em;
+  opacity: 0;
+  transition: opacity 3s ease;
+}
+
+/* Fade */
+.fade { opacity: 0; }
+</style>
+</head>
+
+<body>
+
+<audio id="bgAudio" src="heartbeat.mp3" loop preload="auto"></audio>
+<audio id="jumpscareAudio" src="jumpscare.mp3" preload="auto"></audio>
+
+<div id="aura"></div>
+<div id="screen"></div>
+
+<script>
+const screen = document.getElementById("screen");
+const aura = document.getElementById("aura");
+const audio = document.getElementById("bgAudio");
+const jumpscare = document.getElementById("jumpscareAudio");
+
+let qIndex = -1;
+let fakeProgress = 10;
+let hesitationTimer;
+let hesitationCount = 0;
+let drift = 0;
+
+let baseRate = 1.0;
+let maxRate = 1.85;
+let rate = baseRate;
+let lastInteraction = Date.now();
+
+/* Cursor + interaction tracking */
+document.addEventListener("mousemove", e => {
+  aura.style.left = e.clientX + "px";
+  aura.style.top = e.clientY + "px";
+  lastInteraction = Date.now();
+});
+
+document.addEventListener("click", () => {
+  lastInteraction = Date.now();
+});
+
+/* UI drift + peripheral instability */
+setInterval(() => {
+  drift += 0.7;
+  document.documentElement.style.setProperty("--dx", (Math.random()-0.5)*drift + "px");
+  document.documentElement.style.setProperty("--dy", (Math.random()-0.5)*drift + "px");
+  document.documentElement.style.setProperty("--blur", Math.random() > 0.7 ? "0.6px" : "0px");
+}, 9000);
+
+/* Questions — destabilizing, memory-focused */
+const questions = [
+  "Are you sure this is the first question?",
+  "Do you remember answering something similar earlier?",
+  "Did the interface change while you were reading?",
+  "Are you confident in your last answer?",
+  "Does this question feel familiar?",
+  "Did you expect the progress to look like this?",
+  "Are you aware of your own hesitation?",
+  "Does the silence feel intentional?",
+  "Are you certain your memory is accurate right now?",
+  "Do you feel like something is being adjusted?",
+  "Are you still answering instinctively?",
+  "Does it feel like the system already knows?",
+  "Did you notice the text spacing change?",
+  "Are you responding faster or slower than before?",
+  "Do you trust what you remember from a moment ago?",
+  "Does stopping feel harder than continuing?",
+  "Are you sure this hasn’t already ended?",
+  "Would you recognize repetition if it were subtle?",
+  "Does it feel like time is behaving normally?",
+  "Look behind you. Are you being watched?"
+];
+
+/* Start heartbeat */
+function startAudio() {
+  audio.volume = 0.35;
+  audio.play();
+  audio.playbackRate = rate;
+}
+
+/* Heartbeat escalation */
+setInterval(() => {
+  const idleTime = Date.now() - lastInteraction;
+
+  // Base escalation
+  rate += 0.0015;
+
+  // Faster escalation when idle
+  if (idleTime > 3000) rate += 0.003;
+
+  rate = Math.min(rate, maxRate);
+  audio.playbackRate = rate;
+}, 200);
+
+/* Warning */
+function warning() {
+  screen.innerHTML = `
+    <div class="panel">
+      <h1>WARNING</h1>
+      <p>
+        This experience is intentionally intense.<br><br>
+        It uses uncertainty, repetition, and loss of control.<br><br>
+        There are no jumpscares or graphic content.<br>
+        Leave now if you are uncomfortable.
+      </p>
+      <button onclick="begin()">I UNDERSTAND</button>
+    </div>
+  `;
+}
+
+function begin() {
+  startAudio();
+  next();
+}
+
+/* Next question */
+function next() {
+  clearTimeout(hesitationTimer);
+  qIndex++;
+
+  if (qIndex >= questions.length) {
+    end();
+    return;
+  }
+
+  // Last question bypasses fade and triggers jumpscare
+  if (qIndex === questions.length - 1) {
+    fakeProgress = 100; // max progress for effect
+    screen.innerHTML = `
+      <div class="panel">
+        <p>OBSERVATION STEP ${qIndex + 1}</p>
+        <h1>${questions[qIndex]}</h1>
+        <button class="choice avoid" onclick="answer()">YES</button>
+        <button class="choice avoid" onclick="answer()">NO</button>
+        <div id="progress"><div id="bar" style="width:${fakeProgress}%"></div></div>
+      </div>
+    `;
+    setupAvoidance();
+
+    // Immediate jumpscare
+    jumpscare.play();
+    screen.style.letterSpacing = "1em";
+    whisper("You are being watched.");
+    return;
+  }
+
+  // Normal fade transition for other questions
+  screen.classList.add("fade");
+  setTimeout(() => {
+    screen.classList.remove("fade");
+
+    fakeProgress += Math.random() > 0.6 ? 8 : -12;
+    fakeProgress = Math.max(4, Math.min(96, fakeProgress));
+
+    screen.innerHTML = `
+      <div class="panel">
+        <p>OBSERVATION STEP ${qIndex + 1}</p>
+        <h1>${questions[qIndex]}</h1>
+        <button class="choice avoid" onclick="answer()">YES</button>
+        <button class="choice avoid" onclick="answer()">NO</button>
+        <div id="progress"><div id="bar" style="width:${fakeProgress}%"></div></div>
+      </div>
+    `;
+
+    setupAvoidance();
+
+    hesitationTimer = setTimeout(() => {
+      hesitationCount++;
+      whisper("Delay detected.");
+    }, 4000);
+  }, 1500);
+}
+
+/* Answer with partial relief of heartbeat */
+function answer() {
+  clearTimeout(hesitationTimer);
+
+  rate = Math.max(1.05, rate - 0.12); // partial relief
+
+  setTimeout(() => {
+    whisper(Math.random() > 0.5 ? "Response processed." : "Timing processed.");
+    next();
+  }, Math.random() * 700 + 200);
+}
+
+/* Button avoidance */
+function setupAvoidance() {
+  document.querySelectorAll(".avoid").forEach(btn => {
+    btn.addEventListener("mousemove", () => {
+      btn.style.transform =
+        `translate(${(Math.random()-0.5)*26}px, ${(Math.random()-0.5)*16}px)`;
+    });
+  });
+}
+
+/* Whisper */
+function whisper(text) {
+  const w = document.createElement("div");
+  w.className = "whisper";
+  w.textContent = text;
+  w.style.left = Math.random()*70 + "vw";
+  w.style.top = Math.random()*70 + "vh";
+  document.body.appendChild(w);
+  requestAnimationFrame(() => w.style.opacity = "0.6");
+  setTimeout(() => {
+    w.style.opacity = "0";
+    setTimeout(() => w.remove(), 3000);
+  }, 4500);
+}
+
+/* End */
+function end() {
+  screen.innerHTML = `
+    <div class="panel">
+      <h1>PROCESS COMPLETE</h1>
+      <p>
+        Your responses were sufficient.<br><br>
+        Your certainty fluctuated.<br>
+        That was expected.
+      </p>
+      <p style="opacity:0.35">You may close the page.</p>
+    </div>
+  `;
+}
+
+warning();
+</script>
+
+</body>
+</html>
